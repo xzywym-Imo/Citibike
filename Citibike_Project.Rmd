@@ -1,0 +1,213 @@
+---
+title: "Explore Citi Bike Data"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+  html_notebook: default
+---
+
+### Citi Bike Data
+
+There are over 850 Citi Bike stations in New York City — users check a bike out from a starting station and then dock that bike at a different station when they reach their destination. Citi Bike offers a variety of memberships, but most memberships allow for trips between 30 and 45 minutes — this will be relevant once we start digging into the dataset.
+
+### Investigate the Data
+
+```{r}
+# Load the data set into a data frame
+library(tidyverse)
+
+all_data <- read_csv("january_trips_subset.csv")
+```
+
+```{r}
+# Investigate the data
+
+head(all_data)
+```
+
+```{r}
+
+# Create a heatmap
+all_data %>% 
+  ggplot(aes(x = start.station.longitude, y = start.station.latitude)) +
+  geom_bin2d(binwidth = c(0.001, 0.001))
+```
+
+***how their users are using their bikes***? For example, if younger riders tend to bike much faster than older riders, Citi Bike may want to think about ways to encourage younger riders to bike more cautiously.
+
+### Modifying the Data Frame: Subset and Age
+
+```{r}
+# Create a subset of the data
+short_trips <- all_data %>% 
+  filter(tripduration <= 900)
+```
+
+```{r}
+# Add the age column
+short_trips <- short_trips %>% 
+  mutate(age = 2020 - birth.year)
+```
+
+### Modifying the Data Frame: Distance
+
+```{r}
+# Try creating a distance column in your data frame here:
+library(geosphere)
+    
+```
+
+```{r}
+# Use the geosphere library to create a distance column
+
+short_trips <- short_trips %>% rowwise() %>% 
+  mutate(distance = distHaversine(c(start.station.longitude, start.station.latitude),
+                                  c(end.station.longitude, end.station.latitude)))
+```
+
+### Modifying the Data Frame: Speed
+
+```{r}
+# Create the speed column
+
+short_trips <- short_trips %>% 
+  mutate(`speed (m/s)` = distance/tripduration)
+```
+
+### Modifying the Data Frame: Average Speed by Age
+
+```{r}
+# get the mean speed of each age
+
+short_trips %>% 
+  group_by(age) %>%
+  summarise(mean_speed = mean(`speed (m/s)`)) -> average_speed_by_age
+```
+
+### Visualization!
+
+```{r}
+#  line graph of age and mean speed
+ggplot(average_speed_by_age, aes(x = age, y = mean_speed)) +
+  geom_line(colour = "blue")
+```
+
+```{r}
+# Filter the data frame to only contain rows where the age is less than 80
+average_speed_by_age <- average_speed_by_age %>% 
+  filter(age <= 80)
+```
+
+```{r cccc}
+
+ggplot(average_speed_by_age, aes(x = age, y = mean_speed)) +
+  geom_line(colour = "blue") +
+  labs(title = "Average speed of Citi Bike user by age", x = "Age", y = 'Average Speed') +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+-   Young riders (18 - 30): The average speed increased sharply in this period. This shows younger adults tend to ride faster, perhaps because they are more physically active or ride with more energy.
+
+-   Peak performance (30 - 42): The highest average speed is around this age period, with average speed roughly 2.7 m/s. This shows people around these age tend to have a good physical condition.
+
+-   The average speed gradually slow down after 42, Riders in this group may use bikes more for convenience than for sport, or ride more cautiously.
+
+### Filtering By Gender
+
+```{r}
+# Use group_by() again to group by both age and gender
+short_trips %>% 
+  filter(age <= 80) %>% 
+  group_by(age, gender) %>%
+  summarise(mean_speed = mean(`speed (m/s)`)) -> average_speed_by_age_and_gender
+```
+
+```{r}
+
+average_speed_by_age_and_gender %>% 
+  ggplot(aes(x = age, y = mean_speed, colour = gender)) +
+  geom_line()
+```
+
+```{r warning=FALSE}
+# change the gender column into a factor.
+
+average_speed_by_age_and_gender %>% 
+  ggplot(aes(x = age, y = mean_speed, colour = as.factor(gender))) +
+  geom_line()
+```
+
+```{r}
+# Filter the data frame to only include genders 1 and 2. Set appropriate labels for the legend
+
+average_speed_by_age_and_gender %>% 
+  filter(gender != 0) %>% 
+  ggplot(aes(x = age, y = mean_speed, colour = as.factor(gender))) +
+    geom_line() +
+    labs(title = "Average speed of Citi Bike users by age (January 2020)", x = "Age", y = 'Average Speed (m/s)') +
+    theme(plot.title = element_text(hjust = 0.5)) +
+    scale_color_discrete(name = "Gender", labels = c("Male Identifying", "Female Identifying"))
+    
+```
+
+1.  Both groups show a **similar pattern**: riding speed increases from teenage years to early adulthood, peaks around age **30–35**, and then **gradually declines** with age.
+
+    -   This pattern reflects general **physical performance trends** — younger riders tend to be more physically active and energetic, while older riders may cycle more leisurely.
+
+2.  Gender Differences
+
+    -   Across nearly all ages, **male-identifying riders** (blue line) maintain **slightly higher average speeds** than female-identifying riders (green line).
+
+    -   The gap between genders is roughly **0.2–0.3 m/s**, suggesting moderate but consistent differences in riding style or strength.
+
+    -   After age **60**, speeds for both genders decrease more sharply, possibly due to fewer trips or shorter rides among older users.
+
+3.  Outlier behavior
+
+    -   The spike near 80 for female is unusual, this can be dive further.
+
+### Making a Stacked Bar Plot Of Ages
+
+```{r}
+# Create the age_counts data frame
+age_counts <- short_trips %>% count(age,gender)
+
+```
+
+```{r}
+
+age_counts %>% 
+  ggplot(aes(x = age, y = n, fill = as.factor(gender))) +
+  geom_col()
+```
+
+```{r}
+
+age_counts %>%
+  filter(gender != 0, age < 100) %>% 
+  ggplot(aes(x = age, y = n, fill = as.factor(gender))) +
+  geom_col() +
+  labs(x = 'Age', y = 'Count', title = 'Citibike Users by Age and Gender') +
+  scale_fill_discrete(name = "Gender", label = c('Male', 'Female')) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+Gender differences
+
+-   **Male riders (red)** make up the **majority** of Citi Bike users across all age groups.
+
+-   **Female riders (blue)** account for a smaller but consistent share of rides, showing a similar age pattern but at a lower count.
+
+-   The male-to-female gap appears largest between ages **25–40**, which might reflect differences in commuting preferences or comfort levels with urban cycling.
+
+-   Older riders: Ridership declines sharply after age 50 for both genders, suggesting that older adults are less likely to use shared bikes—possibly due to physical ability, safety concerns, or different travel preferences.
+
+### Further Work
+
+Great work! You've made several graphs that show a real difference in the way different groups of Citi Bike users bike. This could be a valuable asset in helping Citi Bike understand how to make bike riding safer in New York. However, there is so much more you can do with this data!
+
+To begin, there are some major flaws in the way we calculated the speed. Specifically, we made some *huge* assumptions when calculating the distance of each bike ride. Instead of calculating the straight line distance using the geosphere library, we could take advantage of a service like Google Map's API to get a more accurate measurement of distance. If you're interested in look more into this problem, investigate getting a [Google Maps API key](https://developers.google.com/maps/documentation/geocoding/get-api-key) and using a library like [gmapsdistance](https://cran.r-project.org/web/packages/gmapsdistance/gmapsdistance.pdf).
+
+Another great way to extend this project is to investigate other data that Citi Bike makes available. We used data found in the *Citi Bike Trip Histories* section on the [System Data](https://www.citibikenyc.com/system-data) page. On the System Data page, you can find different dataset, including information about membership data and real time station data. You could use this real time data to track how the flow of bikes changes over the course of the day. You could investigate how the weather impacts membership. We would love to see any graphs or insights you produce!
