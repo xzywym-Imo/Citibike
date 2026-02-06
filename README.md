@@ -91,7 +91,7 @@ Understanding who uses the service provides important context for interpreting s
 - Riding speed decreases gradually with age across the user base
 - Gender-based differences in average speed exist but are secondary to age-related trends
 - Citi Bike users are primarily young to middle-aged adults, which likely shapes overall system usage patterns
-- Data visualization plays a critical role in identifying behavioral trends and data quality issues
+
 
 
 ## Limitations and Future Work
